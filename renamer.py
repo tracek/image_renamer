@@ -2,6 +2,7 @@
 
 from PIL import Image
 from glob import glob
+from datetime import datetime
 import time
 import os
 import shutil
@@ -13,7 +14,7 @@ import click
 @click.option('--output', prompt='Output directory', help='Output dir.')
 @click.option('--prefix', help='Optional prefix')
 @click.option("--dry", is_flag=True, show_default=True, default=False, help='Dry run')
-@click.option('--date_format', default='%Y-%m-%d_')
+@click.option('--date_format', default='%Y-%m-%d')
 def process_images(path, output, prefix, dry, date_format):
     """Batch image renamer - from Q with love"""
     image_paths = glob(os.path.join(path, '**/*'), recursive=True)
@@ -21,15 +22,24 @@ def process_images(path, output, prefix, dry, date_format):
         print('No files found')
 
     os.makedirs(output, exist_ok=True)
-    for image_path in image_paths:
+    for idx, image_path in enumerate(image_paths):
         try:
-            if os.path.splitext(image_path)[1].lower() not in ['.jpg', '.png']:
+            extension = os.path.splitext(image_path)[1]
+            if extension.lower() not in ['.jpg', '.png']:
                 continue
             img = Image.open(image_path)
             exif_data = img._getexif()
-            exif_image_date = exif_data[306]
-            image_date = time.strptime(exif_image_date, '%Y:%m:%d %H:%M:%S')
-            new_file_name = time.strftime(date_format, image_date) + os.path.basename(image_path)
+            try:
+                exif_image_date = exif_data[306]
+                image_date = time.strptime(exif_image_date, '%Y:%m:%d %H:%M:%S')
+                image_date = time.strftime(date_format, image_date)
+            except:
+                print(f'No EXIF date Information found for file: {image_path}. '
+                      f'Using file creation / modification time instead')
+                image_date = datetime.utcfromtimestamp(int(os.path.getctime(image_path))).strftime('%Y-%m-%d')
+
+            new_file_name = f'{image_date}_{idx:03d}{extension}'
+
             if prefix:
                 new_file_name = prefix + new_file_name
             new_path = os.path.join(output, new_file_name)
@@ -38,8 +48,6 @@ def process_images(path, output, prefix, dry, date_format):
                 print(image_path + ' -> ' + new_path)
             else:
                 shutil.copy(image_path, new_path)
-        except (TypeError, KeyError) as e:
-            print(f'No EXIF date Information found for file: {image_path}')
         except:
             print(f'Failed to process {image_path}')
             raise

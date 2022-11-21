@@ -15,4 +15,5 @@ Options:
 
 Example:
 ```bash
-./renamer.py --path path_to_images --output Test```
+./renamer.py --path path_to_images --output Test
+```
